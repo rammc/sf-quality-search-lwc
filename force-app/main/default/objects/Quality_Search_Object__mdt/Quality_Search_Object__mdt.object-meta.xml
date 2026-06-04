@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>An object to be queried by Quality Search (e.g. Contact for B2B, Account for Person Accounts). Child of Config, parent of Field.</description>
+    <label>Quality Search Object</label>
+    <pluralLabel>Quality Search Objects</pluralLabel>
+    <visibility>Public</visibility>
+</CustomObject>

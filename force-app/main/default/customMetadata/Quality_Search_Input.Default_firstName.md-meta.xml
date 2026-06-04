@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <label>First Name</label>
+    <protected>false</protected>
+    <values>
+        <field>Config__c</field>
+        <value xsi:type="xsd:string">Default</value>
+    </values>
+    <values>
+        <field>UI_Label__c</field>
+        <value xsi:type="xsd:string">First Name</value>
+    </values>
+    <values>
+        <field>Input_Type__c</field>
+        <value xsi:type="xsd:string">text</value>
+    </values>
+    <values>
+        <field>Role__c</field>
+        <value xsi:type="xsd:string">Filter</value>
+    </values>
+    <values>
+        <field>Sort_Order__c</field>
+        <value xsi:type="xsd:double">40.0</value>
+    </values>
+</CustomMetadata>

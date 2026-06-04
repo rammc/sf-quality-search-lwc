@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Match_Input__c</fullName>
+    <description>The logical Input whose value this field receives. Required for Role = Match or Both. Multiple Field rows can point to the same Input — that is how one input maps across multiple objects.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Match Input</label>
+    <referenceTo>Quality_Search_Input__mdt</referenceTo>
+    <relationshipLabel>Mapped Fields</relationshipLabel>
+    <relationshipName>Mapped_Fields</relationshipName>
+    <required>false</required>
+    <type>MetadataRelationship</type>
+</CustomField>

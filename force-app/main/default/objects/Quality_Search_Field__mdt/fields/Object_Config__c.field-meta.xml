@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Object_Config__c</fullName>
+    <description>Parent object configuration this field belongs to.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Object Config</label>
+    <referenceTo>Quality_Search_Object__mdt</referenceTo>
+    <relationshipLabel>Fields</relationshipLabel>
+    <relationshipName>Fields</relationshipName>
+    <required>true</required>
+    <type>MetadataRelationship</type>
+</CustomField>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>UI_Label__c</fullName>
+    <description>Label shown on the result card next to this field's value. Required for Role = Display or Both.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>UI Label</label>
+    <length>80</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

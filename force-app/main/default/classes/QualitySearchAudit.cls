@@ -9,64 +9,51 @@
  *
  * ─── Data minimisation (GDPR / DSGVO) ─────────────────────────────────────
  *
- *   The audit captures WHICH identifier and filter types were used, never
- *   the values themselves. A typical record looks like:
+ *   The audit captures WHICH input types were used, never the values.
+ *   A typical record looks like:
  *
- *     Parameters_Used__c    : "Email+Birthdate"
- *     Filters_Used__c       : "LastName+City"
+ *     Config_Name__c        : "Default"
+ *     Parameters_Used__c    : "email+birthdate"
+ *     Filters_Used__c       : "lastName+city"
  *     Result_Count__c       : 1
  *     Matched_Record_Ids__c : "003xx0000000ABC,001xx0000000XYZ"
- *     Search_Type__c        : "Contact" | "PersonAccount" | "Combined" | "None"
+ *     Search_Type__c        : "Default_Account_Person"
  *     CreatedById           : (running user — who did the search)
  *     CreatedDate           : (when)
  *
- *   Storing the actual email / phone / birthdate the user typed would
- *   create a high-risk PII log. The matched Id list is sufficient to
- *   reconstruct what was retrieved — which is the question an auditor or
- *   data protection officer will actually ask.
- *
- *   Retention: schedule a job to delete audit rows after the period
- *   documented in your privacy notice. See README "Operational notes".
+ *   Search_Type__c contains the comma-separated DeveloperNames of the
+ *   Quality_Search_Object__mdt rows that returned at least one match,
+ *   or "None" when the result set was empty or refused.
  */
 public without sharing class QualitySearchAudit {
     public static void log(
-        String email,
-        String phone,
-        Date birthdate,
-        String lastName,
-        String firstName,
-        String city,
+        String configName,
+        List<String> qualitativeInputsProvided,
+        List<String> filterInputsProvided,
         List<Id> matchedIds,
         Integer resultCount,
-        String searchType
+        List<String> hittingObjectDevNames
     ) {
-        List<String> identifiers = new List<String>();
-        if (email != null)
-            identifiers.add('Email');
-        if (phone != null)
-            identifiers.add('Phone');
-        if (birthdate != null)
-            identifiers.add('Birthdate');
-
-        List<String> filters = new List<String>();
-        if (lastName != null)
-            filters.add('LastName');
-        if (firstName != null)
-            filters.add('FirstName');
-        if (city != null)
-            filters.add('City');
-
         List<String> idStrings = new List<String>();
         for (Id i : matchedIds)
             idStrings.add(String.valueOf(i));
 
+        String searchType = (hittingObjectDevNames == null || hittingObjectDevNames.isEmpty())
+            ? 'None'
+            : String.join(hittingObjectDevNames, ',');
+
         Quality_Search_Audit__c rec = new Quality_Search_Audit__c(
-            Parameters_Used__c = String.join(identifiers, '+'),
-            Filters_Used__c = String.join(filters, '+'),
+            Config_Name__c = configName,
+            Parameters_Used__c = String.join(safe(qualitativeInputsProvided), '+'),
+            Filters_Used__c = String.join(safe(filterInputsProvided), '+'),
             Result_Count__c = resultCount,
             Matched_Record_Ids__c = String.join(idStrings, ','),
             Search_Type__c = searchType
         );
         insert rec;
+    }
+
+    private static List<String> safe(List<String> in_) {
+        return in_ == null ? new List<String>() : in_;
     }
 }

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Variant__c</fullName>
+    <description>Controls the static record-scope filter applied to the query. B2B_Contact adds IsPersonAccount = FALSE; Person_Account adds IsPersonAccount = TRUE; Standard adds nothing (use for Lead, custom objects, etc.).</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Variant</label>
+    <required>true</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>B2B_Contact</fullName>
+                <default>false</default>
+                <label>B2B Contact</label>
+            </value>
+            <value>
+                <fullName>Person_Account</fullName>
+                <default>false</default>
+                <label>Person Account</label>
+            </value>
+            <value>
+                <fullName>Standard</fullName>
+                <default>true</default>
+                <label>Standard</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

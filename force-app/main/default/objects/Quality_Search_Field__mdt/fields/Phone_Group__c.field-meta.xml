@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Phone_Group__c</fullName>
+    <description>Optional group key. All fields on the same object with the same Phone_Group__c value and Match_Strategy__c = Phone are combined into one OR-clause (e.g. MobilePhone OR Phone OR HomePhone). Leave blank for non-phone fields.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Phone Group</label>
+    <length>40</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

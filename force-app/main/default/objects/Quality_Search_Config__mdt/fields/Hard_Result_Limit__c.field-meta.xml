@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Hard_Result_Limit__c</fullName>
+    <description>If the combined query returns more than this many rows, the search is refused as too-broad (anti-enumeration). Default 50.</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Hard Result Limit</label>
+    <precision>4</precision>
+    <required>true</required>
+    <scale>0</scale>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

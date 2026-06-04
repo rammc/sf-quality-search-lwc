@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Display_Type_Label__c</fullName>
+    <description>Label shown on each matched record card (e.g. "Business Contact", "Person Account", "Lead").</description>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Display Type Label</label>
+    <length>80</length>
+    <required>true</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>
