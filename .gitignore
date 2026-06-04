@@ -1,0 +1,35 @@
+# Salesforce CLI
+.sf/
+.sfdx/
+.localdevserver/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# Node (for optional Jest tests)
+node_modules/
+coverage/
+package-lock.json
+yarn.lock
+
+# Build artefacts
+/dist
+/build
+*.zip
+
+# Local config
+.env
+.env.local

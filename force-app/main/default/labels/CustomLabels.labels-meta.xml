@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomLabels xmlns="http://soap.sforce.com/2006/04/metadata">
+    <labels>
+        <fullName>QualitySearch_AccessDenied</fullName>
+        <categories>QualitySearch</categories>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>QualitySearch access denied</shortDescription>
+        <value>You do not have permission to use Quality Search.</value>
+    </labels>
+    <labels>
+        <fullName>QualitySearch_MinParams</fullName>
+        <categories>QualitySearch</categories>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>QualitySearch minimum parameters</shortDescription>
+        <value>Please provide at least two identifiers (Email, Phone, or Birthdate).</value>
+    </labels>
+    <labels>
+        <fullName>QualitySearch_InvalidDate</fullName>
+        <categories>QualitySearch</categories>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>QualitySearch invalid date</shortDescription>
+        <value>The birthdate is not a valid date.</value>
+    </labels>
+</CustomLabels>

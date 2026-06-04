@@ -1,0 +1,4 @@
+# Local config that should not deploy
+package.xml
+**/jsconfig.json
+**/.eslintrc.json
