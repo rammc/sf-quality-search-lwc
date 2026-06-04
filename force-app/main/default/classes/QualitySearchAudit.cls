@@ -53,7 +53,7 @@ public without sharing class QualitySearchAudit {
         insert rec;
     }
 
-    private static List<String> safe(List<String> in_) {
-        return in_ == null ? new List<String>() : in_;
+    private static List<String> safe(List<String> items) {
+        return items == null ? new List<String>() : items;
     }
 }

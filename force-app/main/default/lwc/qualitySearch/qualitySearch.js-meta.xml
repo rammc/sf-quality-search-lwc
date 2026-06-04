@@ -3,10 +3,21 @@
     <apiVersion>62.0</apiVersion>
     <isExposed>true</isExposed>
     <masterLabel>Quality Search</masterLabel>
-    <description>High-confidence customer lookup by Email, Phone, or Birthdate. Bypasses record sharing for authorised users.</description>
+    <description>High-confidence customer lookup. Form layout and search fields are driven by Quality_Search_Config__mdt — set the configName attribute to pick which configuration to render.</description>
     <targets>
         <target>lightning__AppPage</target>
         <target>lightning__UtilityBar</target>
         <target>lightning__HomePage</target>
     </targets>
+    <targetConfigs>
+        <targetConfig targets="lightning__AppPage,lightning__UtilityBar,lightning__HomePage">
+            <property
+                name="configName"
+                type="String"
+                label="Config Name"
+                description="DeveloperName of the Quality_Search_Config__mdt to load. Defaults to 'Default'."
+                default="Default"
+            />
+        </targetConfig>
+    </targetConfigs>
 </LightningComponentBundle>

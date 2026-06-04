@@ -94,7 +94,7 @@ public with sharing class QualitySearchController {
         FormConfigDTO out = new FormConfigDTO();
         out.configName = cfg.developerName;
         out.qualitativeThreshold = cfg.qualitativeThreshold;
-        out.inputs = cfg.orderedInputs();
+        out.inputs = cfg.getOrderedInputs();
         return out;
     }
 

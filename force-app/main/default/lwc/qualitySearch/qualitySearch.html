@@ -1,152 +1,120 @@
 <template>
     <lightning-card title="Quality Search" icon-name="standard:contact">
         <div class="container">
-            <fieldset class="group">
-                <legend class="group-title">
-                    Optional filters
-                    <span class="optional-tag">Narrow results, do not satisfy the gate</span>
-                </legend>
-
-                <lightning-input
-                    type="text"
-                    label="First Name"
-                    data-field="firstName"
-                    value={firstName}
-                    onchange={handleChange}
-                ></lightning-input>
-
-                <lightning-input
-                    type="text"
-                    label="Last Name"
-                    data-field="lastName"
-                    value={lastName}
-                    onchange={handleChange}
-                ></lightning-input>
-
-                <lightning-input
-                    type="text"
-                    label="City"
-                    data-field="city"
-                    value={city}
-                    onchange={handleChange}
-                ></lightning-input>
-            </fieldset>
-
-            <fieldset class="group">
-                <legend class="group-title">
-                    Qualitative identifiers
-                    <span class="required-tag">Required — at least 2 of 3</span>
-                </legend>
-
-                <lightning-input
-                    type="email"
-                    label="Email"
-                    data-field="email"
-                    value={email}
-                    onchange={handleChange}
-                ></lightning-input>
-
-                <lightning-input
-                    type="tel"
-                    label="Phone"
-                    data-field="phone"
-                    value={phone}
-                    onchange={handleChange}
-                ></lightning-input>
-
-                <lightning-input
-                    type="date"
-                    label="Birthdate"
-                    data-field="birthdate"
-                    value={birthdate}
-                    onchange={handleChange}
-                ></lightning-input>
-            </fieldset>
-
-            <p class="hint">{gateHint}</p>
-
-            <div class="actions">
-                <lightning-button
-                    variant="brand"
-                    label="Search"
-                    disabled={searchDisabled}
-                    onclick={handleSearch}
-                ></lightning-button>
-                <lightning-button
-                    variant="neutral"
-                    label="Reset"
-                    onclick={handleReset}
-                ></lightning-button>
-            </div>
-
-            <template lwc:if={isLoading}>
-                <lightning-spinner alternative-text="Searching" size="small"></lightning-spinner>
+            <template lwc:if={formConfigError}>
+                <div class="error" role="alert">{formConfigError}</div>
             </template>
 
-            <template lwc:if={errorMessage}>
-                <div class="error" role="alert">{errorMessage}</div>
-            </template>
+            <template lwc:if={formConfig}>
+                <fieldset class="group">
+                    <legend class="group-title">
+                        Qualitative identifiers
+                        <span class="tag">Required — at least {qualitativeThreshold}</span>
+                    </legend>
+                    <template for:each={decoratedQualitativeInputs} for:item="i">
+                        <lightning-input
+                            key={i.developerName}
+                            type={i.inputType}
+                            label={i.label}
+                            data-field={i.developerName}
+                            value={i.value}
+                            onchange={handleChange}
+                        ></lightning-input>
+                    </template>
+                </fieldset>
 
-            <template lwc:if={tooManyResults}>
-                <div class="notice" role="status">
-                    Too many matches. Add another identifier or filter to narrow the search.
-                </div>
-            </template>
-
-            <template lwc:if={showNoResults}>
-                <div class="notice" role="status">No matching customer found.</div>
-            </template>
-
-            <template for:each={decoratedMatches} for:item="m">
-                <div key={m.recordId} class="match-card">
-                    <div class="match-header">
-                        <h2 class="match-name">{m.name}</h2>
-                        <span class={m.badgeClass}>{m.typeLabel}</span>
-                    </div>
-                    <dl class="match-fields">
-                        <dt>Email</dt>
-                        <dd>
-                            <lightning-formatted-email
-                                value={m.email}
-                            ></lightning-formatted-email>
-                        </dd>
-                        <dt>Mobile</dt>
-                        <dd>
-                            <lightning-formatted-phone
-                                value={m.mobilePhone}
-                            ></lightning-formatted-phone>
-                        </dd>
-                        <dt>Phone</dt>
-                        <dd>
-                            <lightning-formatted-phone
-                                value={m.phone}
-                            ></lightning-formatted-phone>
-                        </dd>
-                        <dt>Home Phone</dt>
-                        <dd>
-                            <lightning-formatted-phone
-                                value={m.homePhone}
-                            ></lightning-formatted-phone>
-                        </dd>
-                        <dt>Birthdate</dt>
-                        <dd>
-                            <lightning-formatted-date-time
-                                value={m.birthdate}
-                                year="numeric"
-                                month="long"
-                                day="2-digit"
-                            ></lightning-formatted-date-time>
-                        </dd>
-                        <template lwc:if={m.accountName}>
-                            <dt>Account</dt>
-                            <dd>{m.accountName}</dd>
+                <template lwc:if={hasFilters}>
+                    <fieldset class="group">
+                        <legend class="group-title">
+                            Optional filters
+                            <span class="tag">Narrow results, do not satisfy the gate</span>
+                        </legend>
+                        <template for:each={decoratedFilterInputs} for:item="i">
+                            <lightning-input
+                                key={i.developerName}
+                                type={i.inputType}
+                                label={i.label}
+                                data-field={i.developerName}
+                                value={i.value}
+                                onchange={handleChange}
+                            ></lightning-input>
                         </template>
-                        <dt>City</dt>
-                        <dd>{m.city}</dd>
-                        <dt>Country</dt>
-                        <dd>{m.country}</dd>
-                    </dl>
+                    </fieldset>
+                </template>
+
+                <p class="hint">{gateHint}</p>
+
+                <div class="actions">
+                    <lightning-button
+                        variant="brand"
+                        label="Search"
+                        disabled={searchDisabled}
+                        onclick={handleSearch}
+                    ></lightning-button>
+                    <lightning-button
+                        variant="neutral"
+                        label="Reset"
+                        onclick={handleReset}
+                    ></lightning-button>
                 </div>
+
+                <template lwc:if={isLoading}>
+                    <lightning-spinner
+                        alternative-text="Searching"
+                        size="small"
+                    ></lightning-spinner>
+                </template>
+
+                <template lwc:if={errorMessage}>
+                    <div class="error" role="alert">{errorMessage}</div>
+                </template>
+
+                <template lwc:if={tooManyResults}>
+                    <div class="notice" role="status">
+                        Too many matches. Add another identifier or filter to narrow the search.
+                    </div>
+                </template>
+
+                <template lwc:if={showNoResults}>
+                    <div class="notice" role="status">No matching customer found.</div>
+                </template>
+
+                <template for:each={decoratedMatches} for:item="m">
+                    <div key={m.recordId} class="match-card">
+                        <div class="match-header">
+                            <h2 class="match-name">{m.displayName}</h2>
+                            <span class={m.badgeClass}>{m.displayType}</span>
+                        </div>
+                        <dl class="match-fields">
+                            <template for:each={m.fields} for:item="f">
+                                <template lwc:if={f.label}>
+                                    <dt key={f.label} class="field-label">{f.label}</dt>
+                                    <dd key={f.label} class="field-value">
+                                        <template lwc:if={f.isEmail}>
+                                            <lightning-formatted-email
+                                                value={f.value}
+                                            ></lightning-formatted-email>
+                                        </template>
+                                        <template lwc:elseif={f.isPhone}>
+                                            <lightning-formatted-phone
+                                                value={f.value}
+                                            ></lightning-formatted-phone>
+                                        </template>
+                                        <template lwc:elseif={f.isDate}>
+                                            <lightning-formatted-date-time
+                                                value={f.value}
+                                                year="numeric"
+                                                month="long"
+                                                day="2-digit"
+                                            ></lightning-formatted-date-time>
+                                        </template>
+                                        <template lwc:else>{f.value}</template>
+                                    </dd>
+                                </template>
+                            </template>
+                        </dl>
+                    </div>
+                </template>
             </template>
         </div>
     </lightning-card>

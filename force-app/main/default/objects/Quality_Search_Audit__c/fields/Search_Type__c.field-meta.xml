@@ -1,31 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Search_Type__c</fullName>
-    <description>Which result tracks matched: Contact (B2B), PersonAccount (B2C), Combined (both), or None.</description>
+    <description>Comma-separated DeveloperNames of the Quality_Search_Object__mdt rows that produced at least one match in this search, or "None" when the result set was empty or refused. Non-restricted because the set of possible values is admin-configurable per Config.</description>
     <externalId>false</externalId>
     <label>Search Type</label>
     <required>false</required>
     <trackTrending>false</trackTrending>
     <type>Picklist</type>
     <valueSet>
-        <restricted>true</restricted>
+        <restricted>false</restricted>
         <valueSetDefinition>
             <sorted>false</sorted>
-            <value>
-                <fullName>Contact</fullName>
-                <default>false</default>
-                <label>Contact</label>
-            </value>
-            <value>
-                <fullName>PersonAccount</fullName>
-                <default>false</default>
-                <label>PersonAccount</label>
-            </value>
-            <value>
-                <fullName>Combined</fullName>
-                <default>false</default>
-                <label>Combined</label>
-            </value>
             <value>
                 <fullName>None</fullName>
                 <default>false</default>

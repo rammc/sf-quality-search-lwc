@@ -23,8 +23,7 @@
     gap: var(--slds-g-spacing-3, 0.5rem);
 }
 
-.required-tag,
-.optional-tag {
+.tag {
     font-weight: 400;
     font-size: var(--slds-g-font-scale-neg-1, 0.8125rem);
     color: var(--slds-g-color-neutral-2, #5c5c5c);
