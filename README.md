@@ -3,11 +3,14 @@
 > Salesforce Lightning Web Component for high-confidence customer lookup
 > that deliberately bypasses record-level sharing for authorised users —
 > with field-level security, anti-enumeration, and a full audit trail kept
-> intact.
+> intact. **Fields, objects, and the form layout are configured via Custom
+> Metadata** — no Apex changes needed to support additional objects or
+> identifier types.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Salesforce API 62.0+](https://img.shields.io/badge/Salesforce%20API-62.0%2B-blue)
 ![SLDS 2 hooks](https://img.shields.io/badge/SLDS-2-blueviolet)
+![Tests: 29 passing](https://img.shields.io/badge/tests-29%20passing-brightgreen)
 
 ---
 
@@ -35,16 +38,23 @@ enforced.
 ## What it gives you
 
 - A Lightning Web Component (`qualitySearch`) you can drop onto an App
-  Page, Utility Bar, or Home Page.
-- An `@AuraEnabled` Apex controller that runs the privileged lookup behind
-  a 2-of-3 identifier gate.
+  Page, Utility Bar, or Home Page. **Form layout is data-driven** — no
+  template changes needed to add fields or objects.
+- A `@AuraEnabled` Apex controller that runs the privileged lookup behind
+  a configurable N-of-M identifier gate.
+- **Four Custom Metadata Types** that let admins describe one or more
+  named configurations: which objects to search, which fields participate
+  in matching vs. display, which match strategies apply, and how phone
+  variants are OR-combined.
 - A `Quality_Search_Audit__c` custom object capturing every call, with
   values minimised for GDPR / DSGVO.
 - Two Permission Sets: one for users, one for auditors.
-- Custom Permission, Custom Labels, Tab, and an App Page FlexiPage so the
-  whole thing is usable immediately after deploy.
-- An Apex test class with 16 tests at 100% coverage covering the security
-  contract end-to-end.
+- A pluggable match-strategy registry (Exact / Phone / Date) that you can
+  extend in Apex without touching the finder.
+- A pre-seeded "Default" configuration that reproduces a typical
+  Email/Phone/Birthdate lookup over Contact (B2B) and Person Account
+  (B2C).
+- 29 Apex tests, 100% coverage on Audit, 96% on Controller.
 
 ## Use case
 
@@ -56,57 +66,148 @@ enforced.
 > on the appropriate path.
 
 The agent never had ambient access to that record. The agent does have an
-audit row recording that they performed this lookup, with which identifier
-types, and which record Id they retrieved.
+audit row recording which configuration was used, which identifier types
+were provided, and which record Id was retrieved.
+
+---
+
+## Architecture view
+
+### Runtime flow
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ Lightning Web Component: qualitySearch                               │
+│   - @api configName  (App Builder design attribute, default 'Default')│
+│   - @wire(getFormConfig, {configName})                               │
+│       → renders inputs dynamically from CMDT                         │
+│   - imperative search(configName, inputs)                            │
+└──────────────────────────────────────────────────────────────────────┘
+                              │  configName, Map<String,String> inputs
+                              ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ Apex: QualitySearchController          (with sharing)                │
+│   1.  FeatureManagement.checkPermission('Quality_Search_Access')     │
+│   2.  ConfigService.load(configName) ─────► whitelist-validated cfg  │
+│   3.  Enforce qualitativeThreshold from config                       │
+│   4.  Delegate to QualitySearchFinder ────┐                          │
+│   5.  Security.stripInaccessible (FLS)    │                          │
+│   6.  Enforce hardResultLimit refusal     │                          │
+│   7.  Build generic MatchDTO with         │                          │
+│       displayFields[] from config         ▼                          │
+│   8.  QualitySearchAudit.log    ┌────────────────────────────────┐   │
+└─────────────────────────────────│ QualitySearchFinder            │   │
+                                  │  (private without sharing)     │   │
+                                  │                                │   │
+                                  │  - the ONLY sharing-bypass     │   │
+                                  │  - dynamic SOQL from validated │   │
+                                  │    field names + bind vars     │   │
+                                  │  - phone-group OR collapse     │   │
+                                  │  - Database.queryWithBinds(    │   │
+                                  │       soql, binds,             │   │
+                                  │       AccessLevel.SYSTEM_MODE) │   │
+                                  └────────────┬───────────────────┘   │
+                                               │ raw rows               │
+                                               ▼                        │
+                                  ┌────────────────────────────────┐    │
+                                  │ QualitySearchMatchers          │    │
+                                  │  IFieldMatcher registry:       │    │
+                                  │    - ExactMatcher              │    │
+                                  │    - PhoneMatcher              │    │
+                                  │    - DateMatcher               │    │
+                                  └────────────────────────────────┘    │
+                                                                        │
+                                  ┌────────────────────────────────┐    │
+                                  │ Quality_Search_Audit__c        │◀───┘
+                                  │  (OWD Private)                 │
+                                  │  Config_Name__c, Parameters,   │
+                                  │  Filters, Result_Count,        │
+                                  │  Matched_Record_Ids, Type      │
+                                  └────────────────────────────────┘
+```
+
+### Configuration data model
+
+```
+┌─────────────────────────────────────┐
+│  Quality_Search_Config__mdt         │   "Default"
+│  ─────────────────────────────────  │   Threshold: 2  Limit: 50
+│  Qualitative_Threshold__c           │
+│  Hard_Result_Limit__c               │
+│  Is_Active__c                       │
+└──┬──────────────────────────────┬───┘
+   │                              │
+   │ 1 : N                        │ 1 : N
+   ▼                              ▼
+┌────────────────────────────┐  ┌─────────────────────────────────────┐
+│ Quality_Search_Input__mdt  │  │ Quality_Search_Object__mdt          │
+│ ────────────────────────── │  │ ───────────────────────────────────  │
+│ UI_Label__c    "Email"     │  │ Object_API_Name__c   "Contact"      │
+│ Input_Type__c  email       │  │ Variant__c           B2B_Contact    │
+│ Role__c        Qualitative │  │ Display_Type_Label__c "Business..." │
+│ Sort_Order__c  10          │  │ Sort_Order__c        10             │
+└────────────────────────────┘  └──┬──────────────────────────────────┘
+       ▲                           │ 1 : N
+       │                           ▼
+       │ Match_Input__c   ┌──────────────────────────────────────┐
+       └──────────────────│ Quality_Search_Field__mdt            │
+                          │ ──────────────────────────────────── │
+                          │ Field_API_Name__c     "Email"        │
+                          │ Role__c               Both           │
+                          │   (Match / Display / Both)           │
+                          │ Match_Input__c        → Input ref    │
+                          │ Match_Strategy__c     Exact          │
+                          │ Phone_Group__c        primary        │
+                          │ UI_Label__c           "Email"        │
+                          │ Display_Field_Type__c email          │
+                          └──────────────────────────────────────┘
+```
+
+A single **Input** (e.g. "Email") can be mapped to multiple Fields across
+multiple Objects — that is how one form input drives matching on
+`Contact.Email`, `Account.PersonEmail`, `Lead.Email`, and so on in
+parallel.
+
+---
 
 ## Security architecture
 
 ### 1. Sharing bypass is isolated
 
-```text
-QualitySearchController   ← with sharing
-└── PrivilegedFinder      ← private without sharing  (the ONLY bypass)
+```
+QualitySearchController        ← with sharing
+└── QualitySearchFinder        ← private without sharing  (the ONLY bypass)
     └── Database.queryWithBinds(..., AccessLevel.SYSTEM_MODE)
 ```
 
-Only the two SOQL statements inside `PrivilegedFinder` run without sharing.
-Nothing else does. The privileged class is private — it cannot be invoked
-from outside the controller.
+Only the two SOQL statements inside `QualitySearchFinder` run without
+sharing. Nothing else does.
 
 ### 2. FLS is enforced — via `stripInaccessible`, NOT `USER_MODE`
 
 `WITH USER_MODE` would re-impose record sharing, which defeats the entire
-point of this component. Instead, the query runs in `SYSTEM_MODE`
-(bypassing both sharing and FLS), and then the result is passed through
-`Security.stripInaccessible(AccessType.READABLE, rows)`, which nullifies
-any field the running user does not have FLS on. `Id` is never stripped,
-so the record itself survives the strip even if all visible fields would
-have been removed.
+point of this component. The query runs in `SYSTEM_MODE` (bypassing both
+sharing and FLS), and then the result is passed through
+`Security.stripInaccessible(AccessType.READABLE, rows)`.
 
-### 3. The 2-of-3 gate
+### 3. The N-of-M qualitative gate
 
-The controller refuses to query unless at least **two** of the three
-qualitative identifiers are present:
-
-|  Email  |  Phone  |  Birthdate  |
-| :-----: | :-----: | :---------: |
-
-These three fields are the gate. Optional filters (Last Name, First Name,
-City) **only narrow** an already-authorised search; they never count
-toward the 2-of-3 rule.
+The controller refuses to query unless at least the configured number of
+qualitative inputs (Email / Phone / Birthdate by default) are filled.
+Filter inputs (Last Name / First Name / City by default) **only narrow**
+an already-authorised search; they never count toward the gate.
 
 ### 4. Exact match only
 
-No `LIKE`, no wildcards, no case-insensitive fuzzy matching beyond what
-SOQL `=` already does for text. A correctly identified customer matches
-zero or one records.
+No `LIKE`, no wildcards, no fuzzy matching beyond what SOQL `=` already
+does for text. A correctly identified customer matches zero or one
+records.
 
 ### 5. Anti-enumeration refusal
 
-If the gated query somehow matches more than 50 records, the controller
-returns `tooManyResults = true` and zero rows. The UI prompts for a
-tighter search. The audit still captures the refusal (`searchType =
-'None'`, `resultCount = combined hit count`).
+If the gated query matches more than the configured hard limit, the
+controller returns `tooManyResults = true` and zero rows. The audit
+still captures the refusal.
 
 ### 6. Server-side permission gate
 
@@ -119,48 +220,70 @@ control.
 The audit captures *which* identifier types were used, never the values:
 
 ```text
-Parameters_Used__c    : "Email+Birthdate"
-Filters_Used__c       : "LastName+City"
+Config_Name__c        : "Default"
+Parameters_Used__c    : "Default_email+Default_birthdate"
+Filters_Used__c       : "Default_lastName+Default_city"
 Result_Count__c       : 1
 Matched_Record_Ids__c : "001xx0000000ABC"
-Search_Type__c        : "PersonAccount"
+Search_Type__c        : "Default_Account_Person"
 CreatedById           : (who searched)
 CreatedDate           : (when)
 ```
 
-The audit object is OWD `Private`; only the `Quality_Search_Auditor`
-permission set grants read.
+### 8. SOQL injection is impossible — even with admin-controlled field names
 
-### 8. SOQL injection is impossible
+This is the critical part of the configurable design.
 
-Every WHERE clause is a static fragment. Every user-supplied value is
-passed to `Database.queryWithBinds` as a bind parameter. Test
-`injectionPayloadProducesNoMatch` proves this.
+- Every WHERE clause is composed from **static fragments + bind references**.
+- Every user-supplied value is passed to `Database.queryWithBinds` as a
+  bind parameter.
+- Every **admin-supplied** identifier (object API name, field API name)
+  is **whitelist-validated** against `Schema.getGlobalDescribe()` /
+  `SObjectType.getDescribe().fields` before it ever reaches a SOQL string.
+  An admin who types `Email; DROP TABLE` into `Field_API_Name__c` has
+  their CMDT row silently dropped from the in-memory config — the string
+  is never concatenated into SOQL.
+
+See `QualitySearchConfigService.loadFields` for the validation; see
+`QualitySearchControllerTest.injectionPayloadProducesNoMatch` for the
+user-input injection test.
+
+---
 
 ## What is deployed
 
 ```
 force-app/main/default/
-├── classes/
-│   ├── QualitySearchController.cls          ← @AuraEnabled entry + privileged finder
-│   ├── QualitySearchAudit.cls               ← audit DML
-│   └── QualitySearchControllerTest.cls      ← 16 tests, 100% coverage
-├── customPermissions/
-│   └── Quality_Search_Access                ← the gate
-├── flexipages/
-│   └── Quality_Search                       ← App Page hosting the LWC
-├── labels/
-│   └── CustomLabels                         ← 3 user-facing strings (en_US)
-├── lwc/
-│   └── qualitySearch/                       ← LWC bundle
+├── classes/                                  ← 5 production + 3 test
+│   ├── QualitySearchController.cls           ← @AuraEnabled entry
+│   ├── QualitySearchConfig.cls               ← in-memory config DTO
+│   ├── QualitySearchConfigService.cls        ← CMDT loader + whitelist
+│   ├── QualitySearchFinder.cls               ← privileged finder
+│   ├── QualitySearchMatchers.cls             ← match-strategy registry
+│   ├── QualitySearchAudit.cls                ← audit DML
+│   └── *Test.cls                             ← 29 tests, 100% / 96% cov
+├── customMetadata/                           ← 31 Default-config records
+│   ├── Quality_Search_Config.Default.*
+│   ├── Quality_Search_Input.Default_*.*      (6 inputs)
+│   ├── Quality_Search_Object.Default_*.*     (2 objects)
+│   └── Quality_Search_Field.Default_*.*      (22 fields)
+├── customPermissions/Quality_Search_Access
+├── flexipages/Quality_Search                 ← App Page hosting the LWC
+├── labels/CustomLabels                       ← 3 user-facing strings
+├── lwc/qualitySearch/                        ← dynamic, config-driven
 ├── objects/
-│   └── Quality_Search_Audit__c/             ← OWD Private, 5 fields
+│   ├── Quality_Search_Audit__c/              ← OWD Private, 6 fields
+│   ├── Quality_Search_Config__mdt/           ← CMDT type
+│   ├── Quality_Search_Input__mdt/            ← CMDT type
+│   ├── Quality_Search_Object__mdt/           ← CMDT type
+│   └── Quality_Search_Field__mdt/            ← CMDT type
 ├── permissionsets/
-│   ├── Quality_Search_User                  ← run the search
-│   └── Quality_Search_Auditor               ← read the audit trail
-└── tabs/
-    └── Quality_Search                       ← surfaces the App Page
+│   ├── Quality_Search_User                   ← run the search
+│   └── Quality_Search_Auditor                ← read the audit trail
+└── tabs/Quality_Search
 ```
+
+---
 
 ## Installation
 
@@ -168,90 +291,187 @@ force-app/main/default/
 
 - Salesforce CLI (`sf`) v2.x
 - A target org running API 62.0 or later
-- Person Accounts enabled if you want B2C lookup (otherwise the
-  Person Account branch returns empty harmlessly)
+- Person Accounts enabled if you want the seeded B2C lookup (otherwise
+  remove the `Default_Account_Person` Object CMDT record or just deploy
+  without it — the Person Account branch returns empty harmlessly)
 
 ### Deploy
 
 ```bash
 git clone https://github.com/rammc/sf-quality-search-lwc.git
 cd sf-quality-search-lwc
-
-# Authorize your org once
 sf org login web -a my-org
 
-# Deploy the package
-sf project deploy start -o my-org
+# Pass 1 — CMDT type schemas, Apex, LWC, perms, audit object & fields
+sf project deploy start -o my-org \
+  --source-dir force-app/main/default/objects \
+  --source-dir force-app/main/default/classes \
+  --source-dir force-app/main/default/lwc \
+  --source-dir force-app/main/default/customPermissions \
+  --source-dir force-app/main/default/labels \
+  --source-dir force-app/main/default/permissionsets \
+  --source-dir force-app/main/default/flexipages \
+  --source-dir force-app/main/default/tabs
+
+# Pass 2 — seed the Default configuration records (separate pass so the
+# CMDT types are fully provisioned before record deploy)
+sf project deploy start -o my-org \
+  --source-dir force-app/main/default/customMetadata
 
 # Run the tests
-sf apex run test -o my-org --class-names QualitySearchControllerTest \
+sf apex run test -o my-org \
+  --tests QualitySearchControllerTest \
+  --tests QualitySearchConfigServiceTest \
+  --tests QualitySearchMatchersTest \
   --result-format human --code-coverage --wait 10
 ```
 
+> **Note on CMDT record deploy.** Pass 2 occasionally fails with a
+> generic `UNKNOWN_EXCEPTION` on orgs where the just-deployed CMDT type
+> hasn't fully propagated. If you hit this, wait 5–15 minutes and retry
+> pass 2, **or** insert the records via the Apex Metadata API (see
+> `scripts/seed-default-config.apex` for an example, or use any
+> `Metadata.Operations.enqueueDeployment` snippet).
+
 ### Configure
 
-1. **Assign `Quality_Search_User`** to the agents who should be able to
-   run the search.
+```bash
+sf org assign permset -o my-org --name Quality_Search_User
+# Optional — for compliance reviewers
+sf org assign permset -o my-org --name Quality_Search_Auditor
+```
 
-   ```bash
-   sf org assign permset -o my-org --name Quality_Search_User
+Surface the component via the *Quality Search* tab (`/lightning/n/Quality_Search`)
+or add the LWC to any Lightning App Page or Utility Bar. The LWC has a
+`Config Name` design attribute — leave it as `Default` or point at a
+different `Quality_Search_Config__mdt` you create.
+
+---
+
+## Configuration: adding a custom object
+
+Suppose you want Quality Search to also look up Leads. No code change is
+required — add four CMDT rows:
+
+1. **Quality_Search_Object__mdt** record
+   ```
+   DeveloperName        Default_Lead
+   Config__c            Default
+   Object_API_Name__c   Lead
+   Variant__c           Standard   (no IsPersonAccount filter)
+   Display_Type_Label__c "Lead"
+   Sort_Order__c        30
    ```
 
-2. **Assign `Quality_Search_Auditor`** to compliance / security staff who
-   need to read the audit trail. The search users do NOT get this.
+2. **Quality_Search_Field__mdt** rows wiring each searchable / displayable
+   field on Lead. Example (Email match + display):
+   ```
+   DeveloperName        Default_Lead_Email
+   Object_Config__c     Default_Lead
+   Field_API_Name__c    Email
+   Role__c              Both
+   Match_Input__c       Default_email     (re-uses the existing Email input)
+   Match_Strategy__c    Exact
+   UI_Label__c          "Email"
+   Display_Field_Type__c email
+   Sort_Order__c        10
+   ```
 
-3. **Surface the component.** The package ships with a Tab + App Page
-   named *Quality Search*. Open it via `/lightning/n/Quality_Search` or
-   add the Tab to a Lightning App.
+   Repeat for Phone, MobilePhone, FirstName, LastName, Company, etc. —
+   whatever the steward should see on a Lead hit.
 
-4. **(Optional) Define an audit retention job.** See "Operational notes"
-   below.
+3. (No Input rows to add — Lead reuses the inputs already declared on
+   the Default config.)
 
-## Usage
+That's it. Hard-reload the Lightning page and Leads will be queried in
+addition to Contacts and Person Accounts on the next search.
 
-1. Open the *Quality Search* tab.
-2. Optionally narrow with First Name / Last Name / City.
-3. Provide **at least two** of Email / Phone / Birthdate.
-4. Click *Search*. A matched customer renders as a detail card, marked
-   "Business Contact" or "Person Account".
+**Whitelist enforcement**: if you type a non-existent field name into
+`Field_API_Name__c`, the loader silently drops that row and logs a
+warning at `LoggingLevel.WARN`. The search still works on the remaining
+valid fields. No SOQL fragment composed from an admin-supplied name ever
+runs without first being matched against `Schema.fields.getMap()`.
 
-The Search button is disabled until the 2-of-3 rule is satisfied. The
-controller re-validates the same rule server-side — disabling the UI
-button is only a UX convenience.
+---
+
+## Multi-config setups
+
+Each LWC placement can render a different configuration via the
+`Config Name` App Builder property. Typical pattern:
+
+- `Default` — service agent everyday lookup
+- `Fraud` — fraud reviewer with stricter threshold (e.g. 3-of-4) and a
+  different display set
+- `Onboarding` — limited to Lead only
+
+Create one `Quality_Search_Config__mdt` per scenario, point separate
+LWC instances at them, and gate each placement with its own Permission
+Set if needed.
+
+---
+
+## Match strategies
+
+| Strategy | Normalisation                                                      | Use for                          |
+|----------|--------------------------------------------------------------------|----------------------------------|
+| `Exact`  | Trim whitespace; SOQL `=` is already case-insensitive for text     | Email, names, IDs, addresses     |
+| `Phone`  | Strip everything except digits and leading `+`                     | All phone variants               |
+| `Date`   | Parse ISO `yyyy-MM-dd`; throw on malformed input                   | Birthdate, dates                 |
+
+Add a new strategy by implementing `QualitySearchMatchers.IFieldMatcher`,
+registering it in the `REGISTRY` map, and adding the picklist value to
+`Quality_Search_Field__mdt.Match_Strategy__c`.
+
+---
 
 ## Known limitations
 
 ### Phone normalisation depends on stored format
 
-The controller strips everything except digits and `+` from the user
-input and matches that exact string against `MobilePhone`, `Phone`,
-`HomePhone`, `OtherPhone`, `AssistantPhone` (and the Person* equivalents).
-Exact match against a stored phone is therefore **only reliable when the
-stored value is also normalised** — ideally E.164.
+The `Phone` matcher strips everything except digits and `+` from the
+user input. Exact match against a stored phone is therefore only
+reliable when the stored value is also normalised (ideally E.164).
+If your data is stored in mixed formats, either:
 
-If your org stores phones in mixed formats (`+49 30 1234567`,
-`030-1234567`, etc.), do one of the following before relying on phone
-match:
+- Add a formula field that normalises on read and point the
+  `Field_API_Name__c` at the formula instead of the raw phone field.
+- Normalise on write via a trigger or Flow.
 
-- Add a formula field that normalises phones on read, and change the
-  controller to match against that field.
-- Normalise on write via a trigger / Flow.
+### CMDT records may need a second deploy pass
 
-The component is fully usable on Email + Birthdate without touching
-phone normalisation.
+As noted in *Installation*, the standard `sf project deploy start` for
+`customMetadata` records can fail with `UNKNOWN_EXCEPTION` immediately
+after a fresh CMDT type deployment. Workaround: deploy in two passes
+with a short wait between, or use the Apex Metadata API.
+
+### CMDT DeveloperName 40-char limit
+
+Salesforce enforces a 40-character maximum on `CustomMetadata.fullName`
+(everything after the `.`). The seeded fields use the `Default_B2B_*`
+and `Default_PA_*` prefixes to stay safely under that limit. Pick
+similarly short prefixes for your own configurations.
 
 ### Shield Platform Encryption
 
 If `Email` or `MobilePhone` are encrypted with **probabilistic**
 encryption, exact-match SOQL filtering on them is impossible at the
-platform level — encrypted or not. Use **deterministic** encryption for
-any field you intend to query exactly.
+platform level. Use **deterministic** encryption for any field you
+intend to query exactly.
 
 ### Person Account RecordType developer name
 
 The test fixture assumes a `PersonAccount` developer-name RecordType.
 If your org renames it (some industry templates do), update the lookup
 in `QualitySearchControllerTest.setup`.
+
+### Relationship fields are not supported in V1
+
+`Field_API_Name__c` currently accepts only direct fields on the queried
+object. Dotted paths like `Account.Name` would require parsing,
+relationship-aware describe validation, and SELECT-side handling. Open
+issue if you need this.
+
+---
 
 ## Operational notes
 
@@ -271,71 +491,48 @@ go-live, document:
 
 Consider Event Monitoring or Transaction Security to flag unusual search
 volume per user. The audit table is the data source; one record per call
-makes anomaly queries trivial.
+makes anomaly queries trivial. `Config_Name__c` lets you split anomaly
+thresholds per scenario.
 
 ### Monitoring
 
 The audit object's `Search_Type__c = 'None'` value distinguishes
 no-result calls from too-broad refusals from successful matches. A
-dashboard split by this field tells you whether the component is being
-used as designed.
+dashboard split by `Config_Name__c` + `Search_Type__c` tells you whether
+each configuration is being used as designed.
 
-## Architecture diagram
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│ LWC  qualitySearch                                               │
-│   - 6 inputs (3 qualitative + 3 filters)                         │
-│   - Client-side 2-of-3 hint                                      │
-│   - Imperative call to QualitySearchController.search            │
-└──────────────────────────────────────────────────────────────────┘
-                              │  flat String args
-                              ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ Apex  QualitySearchController            (with sharing)          │
-│   1. checkPermission('Quality_Search_Access')                    │
-│   2. enforce 2-of-3 gate                                         │
-│   3. normalise inputs                                            │
-│   4. delegate to PrivilegedFinder ────────────┐                  │
-│   5. Security.stripInaccessible                ▼                 │
-│   6. build DTOs                  ┌────────────────────────────┐  │
-│   7. enforce >50 refusal         │ PrivilegedFinder           │  │
-│   8. call QualitySearchAudit.log │  (private without sharing) │  │
-│   9. return SearchResult         │                            │  │
-│                                  │ - Contact query            │  │
-│                                  │ - Account (Person) query   │  │
-│                                  │ - SYSTEM_MODE              │  │
-│                                  │ - queryWithBinds           │  │
-│                                  └────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
-                              │  audit row (without sharing)
-                              ▼
-                  Quality_Search_Audit__c  (OWD Private)
-```
+---
 
 ## Testing
 
 ```bash
-sf apex run test -o my-org --class-names QualitySearchControllerTest \
+sf apex run test -o my-org \
+  --tests QualitySearchControllerTest \
+  --tests QualitySearchConfigServiceTest \
+  --tests QualitySearchMatchersTest \
   --result-format human --code-coverage --wait 10
 ```
 
 Expect:
 
-- 16/16 tests pass
-- 100% line coverage on `QualitySearchController`
+- 29/29 tests pass
 - 100% line coverage on `QualitySearchAudit`
+- 96% line coverage on `QualitySearchController`
 
-Tests cover: permission gate, 2-of-3 gate, B2B match, Person Account
-match, invalid birthdate, SOQL injection literal, audit-row content,
-no-result audit, too-broad refusal, phone normalisation, filter
-narrowing, filter-alone gate rejection, audit filter capture.
+Tests cover: permission gate, qualitative gate, B2B match, Person Account
+match, invalid birthdate, SOQL injection literal, audit row content (incl.
+new `Config_Name__c`), no-result audit, too-broad refusal, phone
+normalisation, phone-group OR across MobilePhone/Phone/HomePhone, filter
+narrowing, filter-alone gate rejection, config loading + whitelist,
+ordered inputs for the LWC bridge, every match strategy.
+
+---
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). The bar is "does this preserve
 the security contract?" — please read that file before opening a PR
-that touches the controller.
+that touches the controller, finder, or config service.
 
 ## License
 
@@ -344,6 +541,6 @@ that touches the controller.
 ## Acknowledgements
 
 - Salesforce Lightning Design System (SLDS 2) for the styling hooks.
-- The Salesforce Apex documentation for `Security.stripInaccessible` and
-  `Database.queryWithBinds`, which together make the security model
-  expressible.
+- The Salesforce Apex documentation for `Security.stripInaccessible`,
+  `Database.queryWithBinds`, and the `Metadata.Operations` deployment
+  API — together they make the security model expressible.
